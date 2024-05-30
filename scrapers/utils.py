@@ -2,10 +2,10 @@ import requests
 from time import sleep
 
 
-def send_request(url, method, data, attempt):
+def send_request(url, method, data, json, attempt):
     try:
         if method == 'post':
-            response = requests.post(url, data=data)
+            response = requests.post(url, data=data, json=json)
         elif method == 'get':
             response = requests.get(url)
         else:
@@ -20,9 +20,9 @@ def send_request(url, method, data, attempt):
     return None
 
 
-def send_request_with_retries(url, method='get', data=None, retries=6, delay=10):
+def send_request_with_retries(url, method='get', data=None, json=None, retries=6, delay=10):
     for idx in range(retries):
-        response = send_request(url, method, data, idx+1)
+        response = send_request(url, method, data, json, idx+1)
         if response is not None:
             return response
         print(f"Retrying in {delay} seconds...\n")
