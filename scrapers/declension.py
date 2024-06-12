@@ -1,28 +1,29 @@
 import re
-from urllib.parse import quote
 import requests
-from utils import send_request_with_retries
 from bs4 import BeautifulSoup
+from urllib.parse import quote
+from utils import send_request_with_retries
 
 
-api_url = "https://sloworz.org/api/graphql"
+API_URL = "https://sloworz.org/api/graphql"
+POLISH_NOUN_API_URL = "https://odmiana.net/odmiana-przez-przypadki-rzeczownika-"
 
 
-def fetch_polish_noun_declension(noun):
-    noun = noun.strip()
-    encoded_noun = quote(noun)
-    url = f"https://odmiana.net/odmiana-przez-przypadki-rzeczownika-{encoded_noun}"
+def fetch_polish_noun_declension(noun: str) -> dict:
+    stripped_noun = noun.strip()
+    quoted_noun = quote(stripped_noun)
+    url = f"{POLISH_NOUN_API_URL}{quoted_noun}"
     response = requests.get(url)
 
     if response.status_code != 200:
-        return None
+        return {}
 
     html_content = response.content
     soup = BeautifulSoup(html_content, 'html.parser')
     declension_table = soup.find('table')
 
     if not declension_table:
-        return None
+        return {}
 
     declension_dict = {
         "nounVariation": {
@@ -68,14 +69,9 @@ def fetch_polish_noun_declension(noun):
     return declension_dict
 
 
-def process_word(s):
-    # Remove any integer within parentheses, including the parentheses
+def process_word(s: str) -> str:
     s = re.sub(r'\s*\(\d+\)\s*', '', s)
-
-    # Remove parentheses but keep the content inside
     s = re.sub(r'\(([^)]+)\)', r'\1', s)
-
-    # Remove square brackets but keep the content inside
     s = re.sub(r'\[([^]]+)]', r'\1', s)
 
     return s.strip() + '\n'
@@ -100,7 +96,7 @@ def find_kashubian_entry(pl_file, csb_file, entry_id):
           }}
         }}
         """
-    response = send_request_with_retries(api_url, 'post', json={'query': find_kashubian_entry_query})
+    response = send_request_with_retries(API_URL, 'post', json={'query': find_kashubian_entry_query})
     entry = response.json()['data']['findKashubianEntry']
     meanings = entry['meanings']
 
@@ -111,7 +107,7 @@ def find_kashubian_entry(pl_file, csb_file, entry_id):
         polish_translations = [part.strip() for part in meaning['translation']['polish'].split(',')]
         for translation in polish_translations:
             polish_declension_dict = fetch_polish_noun_declension(process_word(translation))
-            if polish_declension_dict is None:
+            if not polish_declension_dict:
                 continue
             for declension, word in entry['variation']['nounVariation'].items():
                 if not word or declension in ('nominative', 'nominativePlural'):
@@ -139,7 +135,7 @@ def find_all_kashubian_entries(pl_file, csb_file, start, limit):
           }}
         }}
         """
-    response = send_request_with_retries(api_url, 'post', json={'query': find_all_kashubian_entries_query})
+    response = send_request_with_retries(API_URL, 'post', json={'query': find_all_kashubian_entries_query})
     entries = response.json()['data']['findAllKashubianEntries']['select']
     for entry in entries:
         find_kashubian_entry(pl_file, csb_file, entry['id'])
